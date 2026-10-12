@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Expediente IA: reconstruye qué pasó</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+:root{
+  --bg:#EEF2F7; --surface:#FFFFFF; --ink:#101828; --muted:#52607A; --line:#CBD5E4;
+  --accent:#2B50E6; --accent-ink:#FFFFFF; --tape:#FFC93C; --tape-ink:#101828;
+  --ok:#0F7A55; --ok-bg:#DDF4EA; --bad:#C0352B; --bad-bg:#FBE3E0;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1420; --surface:#1A2133; --ink:#E8ECF5; --muted:#9AA7C0; --line:#2E3956;
+    --accent:#7C98FF; --accent-ink:#0F1420; --ok:#4FD1A0; --ok-bg:#12372B; --bad:#FF7D72; --bad-bg:#431D1A;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1420; --surface:#1A2133; --ink:#E8ECF5; --muted:#9AA7C0; --line:#2E3956;
+  --accent:#7C98FF; --accent-ink:#0F1420; --ok:#4FD1A0; --ok-bg:#12372B; --bad:#FF7D72; --bad-bg:#431D1A;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:17px;line-height:1.5;min-height:100vh}
+h1,h2,h3{font-family:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;line-height:1.1;margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tape{height:22px;background:repeating-linear-gradient(-45deg,var(--tape) 0 16px,#101828 16px 32px)}
+.wrap{max-width:720px;margin:0 auto;padding:20px 16px 40px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.brand{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:18px}
+.tools button{background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin-left:6px;color:var(--muted)}
+.hud{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.pill{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 14px;font-weight:700}
+.bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin-bottom:18px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
+.tag{display:inline-block;background:var(--tape);color:var(--tape-ink);font-weight:700;font-size:14px;padding:2px 10px;border-radius:4px;margin-bottom:12px}
+.q{font-size:22px;font-family:"Bricolage Grotesque",sans-serif;font-weight:600;line-height:1.25;margin-bottom:6px}
+.ctx{color:var(--muted);margin:0 0 16px}
+.opts{display:grid;gap:10px;margin-top:14px}
+.opt{text-align:left;background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:12px 14px}
+.opt:hover:not(:disabled){border-color:var(--accent)}
+.opt.ok{border-color:var(--ok);background:var(--ok-bg)}
+.opt.bad{border-color:var(--bad);background:var(--bad-bg)}
+.opt:disabled{cursor:default}
+.fb{margin-top:18px;border-radius:10px;padding:14px 16px;border-left:6px solid var(--ok);background:var(--ok-bg)}
+.fb.bad{border-color:var(--bad);background:var(--bad-bg)}
+.fb b.stamp{display:inline-block;font-family:"Bricolage Grotesque",sans-serif;font-size:20px;border:3px solid currentColor;border-radius:6px;padding:0 10px;transform:rotate(-3deg);margin-bottom:8px;color:var(--ok)}
+.fb.bad b.stamp{color:var(--bad)}
+.fb p{margin:4px 0 0}
+.primary{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:12px 22px;font-weight:700;margin-top:16px}
+.ghost{background:none;border:2px solid var(--line);border-radius:10px;padding:10px 18px;font-weight:700;margin-top:16px;margin-left:8px}
+.slots{display:grid;gap:8px;margin:14px 0}
+.slot{min-height:46px;border:2px dashed var(--line);border-radius:10px;padding:10px 14px;display:flex;gap:10px;align-items:center;color:var(--muted)}
+.slot.filled{border-style:solid;border-color:var(--accent);color:var(--ink);background:var(--bg)}
+.slot.ok{border-color:var(--ok);background:var(--ok-bg)}
+.slot.bad{border-color:var(--bad);background:var(--bad-bg)}
+.slot span.n{font-weight:800;min-width:22px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--bg);border:2px solid var(--line);border-radius:999px;padding:8px 14px}
+.chip:hover:not(:disabled){border-color:var(--accent)}
+.chip:disabled{opacity:.35;cursor:default}
+.big{font-size:44px;margin:6px 0}
+.rank{font-size:26px;font-family:"Bricolage Grotesque",sans-serif;font-weight:800}
+.review{margin:14px 0 0;padding-left:20px}
+.review li{margin-bottom:8px}
+.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@media (prefers-reduced-motion:reduce){.shake{animation:none}.bar i{transition:none}}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="tape" aria-hidden="true"></div>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">Expediente IA</div>
+    <div class="tools">
+      <button id="snd" aria-label="Activar o silenciar el sonido">Sonido: sí</button>
+    </div>
+  </div>
+  <div id="app"></div>
+</div>
+
+<script>
+/* ---------- Banco de preguntas ---------- */
+const Q = [
+ // Conceptos
+ {t:"Concepto", q:"¿Qué pregunta responde la DOCUMENTACIÓN?", o:["¿Qué hicimos?","¿Cómo demostramos que ocurrió?","¿Quién debía responder?"], a:0, e:"Documentar es registrar qué se hizo: datos, prompts, resultados, decisiones, pruebas y responsables."},
+ {t:"Concepto", q:"¿Qué pregunta responde la EVIDENCIA?", o:["¿Por qué la IA dio ese resultado?","¿Cómo demostramos que algo ocurrió?","¿Qué datos usó el modelo?"], a:1, e:"La evidencia demuestra que algo ocurrió: una captura, una conversación guardada, un archivo, un registro o un historial."},
+ {t:"Concepto", q:"¿Qué es la TRAZABILIDAD?", o:["Poder seguir el rastro completo de una decisión, desde la entrada hasta la consecuencia","Explicar con matemáticas cómo funciona el modelo","Borrar los registros viejos para ahorrar espacio"], a:0, e:"Trazabilidad: ENTRADA → IA → RESULTADO → REVISIÓN → DECISIÓN → CONSECUENCIA. Si falta un eslabón, no se puede reconstruir."},
+ {t:"Concepto", q:"¿Qué pregunta responde la EXPLICABILIDAD?", o:["¿Quién firmó el contrato?","¿Por qué se produjo determinado resultado?","¿Cuándo se hizo la copia de seguridad?"], a:1, e:"Explicabilidad es comprender por qué el sistema produjo ese resultado, no solo cuál fue."},
+ {t:"Concepto", q:"¿Qué pregunta responde la RESPONSABILIDAD?", o:["¿Quién debía actuar o responder por la decisión?","¿Qué versión del modelo se usó?","¿Qué pantalla se capturó?"], a:0, e:"Responsabilidad es determinar quién debe responder por las decisiones, aunque una IA haya participado."},
+ {t:"Concepto", q:"Una escuela avisa a las familias que usa IA para ordenar los grupos de trabajo y cómo lo hace. ¿Qué principio cumple?", o:["Transparencia","Auditabilidad","Historial de versiones"], a:0, e:"Transparencia es informar qué ocurre y cómo se utiliza la IA."},
+ {t:"Concepto", q:"Meses después, una auditora externa puede revisar paso a paso cómo se tomó una decisión con IA. ¿Qué propiedad lo permite?", o:["Auditabilidad","Velocidad","Anonimato"], a:0, e:"Auditabilidad: que otra persona pueda revisar el proceso posteriormente. Sin registros, no hay auditoría posible."},
+ {t:"Concepto", q:"¿Qué debe permitir identificar un buen historial de versiones?", o:["Solo la fecha del último cambio","Qué cambió, cuándo, por qué, quién lo hizo y qué resultado produjo","El nombre del archivo y su tamaño"], a:1, e:"El historial de versiones responde: qué cambió → cuándo → por qué → quién → qué resultado produjo (CE3.4)."},
+ // Casos
+ {t:"Caso: Air Canada", q:"Un chatbot oficial dio información incorrecta sobre una tarifa especial y la empresa luego rechazó el beneficio. Si negara haberlo dicho, ¿qué prueba sería la más útil?", o:["Un recuerdo del cliente","La captura o registro de la conversación con fecha","Una publicación en redes sociales sin fecha"], a:1, e:"Un registro de la conversación demuestra qué respondió el chatbot. Además, una empresa responde por lo que dice su canal oficial, aunque sea una IA."},
+ {t:"Caso: Mata v. Avianca", q:"Dos abogados presentaron ante un tribunal casos judiciales inventados por ChatGPT. ¿Qué debió quedar registrado para demostrar que hubo control?", o:["Que la respuesta sonaba segura","Que cada cita fue verificada en una fuente oficial, por quién y cuándo","Que se usó la última versión de la herramienta"], a:1, e:"Verificar antes de usar y dejar constancia: quién revisó, qué fuente consultó y cuándo. Que la IA suene convincente no es verificación."},
+ {t:"Caso: Amazon", q:"Una herramienta experimental para analizar currículums mostró resultados sesgados por género, en parte por los datos históricos. ¿Qué conviene conservar para investigar?", o:["Solo el resultado final de cada candidato","Los datos usados, la versión del modelo que produjo el problema y los cambios posteriores","Nada: se descarta la herramienta y se olvida"], a:1, e:"Para investigar un sesgo hacen falta datos, versión y cambios. Sin ese rastro no se sabe de dónde viene el problema ni si se corrigió."},
+ {t:"Caso: Uber", q:"Tras el accidente fatal de una prueba de conducción automatizada en Arizona, los registros permitieron investigar. ¿Qué debería registrar un sistema así?", o:["Qué detectó, qué hizo y cuándo intervino una persona, con marcas de tiempo","Solo si el viaje terminó bien","Únicamente la velocidad máxima del día"], a:0, e:"Para reconstruir los hechos segundo a segundo se necesita registrar detecciones, acciones del sistema e intervenciones humanas con hora."},
+ {t:"Caso: Robert Williams", q:"Una coincidencia incorrecta de reconocimiento facial contribuyó a que se investigara a la persona equivocada. ¿Qué debería existir entre el resultado de la IA y la decisión humana?", o:["Nada: si la IA coincide, se actúa","Una revisión humana independiente, documentada, antes de decidir sobre la persona","Una segunda IA que confirme a la primera"], a:1, e:"Una coincidencia es una pista, no una prueba. La revisión humana debe quedar documentada para que la recomendación no se convierta sola en decisión."},
+ {t:"Caso: Air Canada", q:"En el caso del chatbot de Air Canada, ¿de quién era la responsabilidad por la información incorrecta?", o:["Del chatbot, porque es quien habló","De la empresa que lo puso a atender clientes","Del cliente por confiar en él"], a:1, e:"Un sistema no responde ante nadie: la organización que lo despliega responde por lo que comunica."},
+ // Razonamiento
+ {t:"Razonamiento", q:"Una organización dice: “La IA se equivocó”, y nada más. ¿Es una justificación suficiente?", o:["Sí, la IA es independiente","No: personas y organizaciones eligieron, supervisaron y usaron ese sistema","Solo si el error fue pequeño"], a:1, e:"Decir “la IA se equivocó” no justifica nada. Siempre hubo personas que decidieron usarla, revisarla y actuar con su resultado."},
+ {t:"Razonamiento", q:"Un compañero usó IA para su trabajo, pero no guardó el prompt ni la respuesta. ¿Qué le falta?", o:["Documentación y evidencia de cómo se produjo el trabajo","Un modelo más potente","Más hojas en el informe"], a:0, e:"Sin prompt ni resultado guardados no puede demostrar cómo trabajó ni reconstruir el proceso."},
+ {t:"Razonamiento", q:"¿Cuál de estas opciones es EVIDENCIA y no solo una opinión?", o:["“Creo que la IA dijo algo así”","Un registro con fecha y hora de la conversación completa","“Seguro que nadie revisó nada”"], a:1, e:"La evidencia es verificable: un archivo, registro o historial, no una suposición ni un recuerdo."},
+ {t:"Razonamiento", q:"Un sistema de IA recomienda rechazar una solicitud y la persona a cargo la rechaza sin mirarla. ¿Qué problema aparece?", o:["Falta supervisión humana real","Falta memoria en el servidor","El modelo es demasiado lento"], a:0, e:"Si la recomendación se convierte automáticamente en decisión, la supervisión es solo formal. Debe quedar constancia de la revisión."},
+ // Ordenar
+ {t:"Ordenar", type:"order", q:"Ordena la cadena de trazabilidad de una decisión con IA.", items:["Entrada","IA","Resultado","Revisión","Decisión","Consecuencia"], e:"Cada eslabón debería dejar rastro. Si la revisión no queda registrada, la decisión parece salir directo de la IA."},
+ {t:"Ordenar", type:"order", q:"Ordena lo que se construye en la pizarra al analizar un caso.", items:["Datos / entrada","IA","Resultado","Intervención humana","Consecuencia","Evidencia"], e:"Este esquema sirve para analizar cualquier caso: de dónde parten los datos, qué hizo la IA, quién intervino y cómo se prueba."},
+ {t:"Ordenar", type:"order", q:"Ordena las preguntas del historial de versiones.", items:["Qué cambió","Cuándo","Por qué","Quién lo hizo","Qué resultado produjo"], e:"Un cambio sin motivo ni autor no es trazable. Con las cinco respuestas se puede reconstruir la historia."}
+];
+
+/* ---------- Utilidades ---------- */
+const $ = s => document.querySelector(s);
+const shuffle = a => { a = a.slice(); for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+let soundOn = true, ctx = null;
+function tone(f, d, type="sine", t0=0, vol=.12){
+  if(!soundOn) return;
+  try{
+    ctx = ctx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = f; o.connect(g); g.connect(ctx.destination);
+    const t = ctx.currentTime + t0;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t+d);
+    o.start(t); o.stop(t+d);
+  }catch(e){}
+}
+const sfx = {
+  ok(){ tone(523,.12,"triangle"); tone(784,.2,"triangle",.1); },
+  bad(){ tone(220,.18,"sawtooth",0,.08); tone(150,.3,"sawtooth",.14,.08); },
+  stamp(){ tone(90,.12,"square",0,.15); },
+  win(){ [523,659,784,1047].forEach((f,i)=>tone(f,.25,"triangle",i*.12)); }
+};
+$("#snd").onclick = () => { soundOn = !soundOn; $("#snd").textContent = "Sonido: " + (soundOn?"sí":"no"); };
+
+/* ---------- Estado ---------- */
+const LIVES = 4, ROUNDS = 16;
+let deck, i, score, lives, streak, best, fails, answered;
+
+const app = $("#app");
+
+function start(){
+  app.innerHTML = `
+    <div class="card">
+      <span class="tag">Caso abierto</span>
+      <h1 style="font-size:34px;margin-bottom:10px">Cuando una IA falla, ¿se puede reconstruir qué pasó?</h1>
+      <p class="ctx">Eres investigador de auditoría. Analiza casos reales (Air Canada, Mata v. Avianca, Amazon, Uber y Robert Williams), distingue documentación, evidencia y trazabilidad, y ordena la cadena de una decisión con IA.</p>
+      <p class="ctx">${ROUNDS} preguntas. Tienes ${LIVES} vidas: cada error resta una. Si aciertas varias seguidas, ganas bonus.</p>
+      <button class="primary" id="go">Abrir expediente</button>
+    </div>`;
+  $("#go").onclick = () => { tone(440,.1,"triangle"); begin(); };
+}
+
+function begin(){
+  const orders = shuffle(Q.filter(x=>x.type==="order")).slice(0,2);
+  const rest = shuffle(Q.filter(x=>x.type!=="order")).slice(0, ROUNDS-orders.length);
+  deck = shuffle(rest.concat(orders));
+  i = 0; score = 0; lives = LIVES; streak = 0; best = 0; fails = [];
+  render();
+}
+
+function hud(){
+  return `<div class="hud">
+    <span class="pill">Pregunta ${i+1} de ${deck.length}</span>
+    <span class="pill">Puntos: ${score}</span>
+    <span class="pill" aria-label="${lives} vidas">Vidas: ${"♥".repeat(lives)}${"♡".repeat(LIVES-lives)}</span>
+    <span class="pill">Racha: ${streak}</span>
+  </div>
+  <div class="bar"><i style="width:${(i/deck.length)*100}%"></i></div>`;
+}
+
+function render(){
+  answered = false;
+  const q = deck[i];
+  if(q.type==="order") return renderOrder(q);
+  const opts = shuffle(q.o.map((t,k)=>({t, c:k===q.a})));
+  app.innerHTML = hud() + `<div class="card" id="card">
+    <span class="tag">${q.t}</span>
+    <div class="q">${q.q}</div>
+    <div class="opts">${opts.map((o,k)=>`<button class="opt" data-k="${k}">${o.t}</button>`).join("")}</div>
+    <div id="fb"></div></div>`;
+  document.querySelectorAll(".opt").forEach(b => b.onclick = () => {
+    if(answered) return; answered = true;
+    const o = opts[+b.dataset.k];
+    document.querySelectorAll(".opt").forEach((x,k)=>{ x.disabled = true; if(opts[k].c) x.classList.add("ok"); });
+    if(!o.c) b.classList.add("bad");
+    resolve(o.c, q);
+  });
+}
+
+function renderOrder(q){
+  const target = q.items, pool = shuffle(target.map((t,k)=>t));
+  let chosen = [];
+  app.innerHTML = hud() + `<div class="card" id="card">
+    <span class="tag">${q.t}</span>
+    <div class="q">${q.q}</div>
+    <p class="ctx">Toca las piezas en el orden correcto. Si te equivocas, reinicia.</p>
+    <div class="slots" id="slots"></div>
+    <div class="chips" id="chips"></div>
+    <button class="ghost" id="reset" style="margin-left:0">Reiniciar orden</button>
+    <div id="fb"></div></div>`;
+  const slots = $("#slots"), chips = $("#chips");
+  function draw(){
+    slots.innerHTML = target.map((_,k)=> chosen[k]
+      ? `<div class="slot filled"><span class="n">${k+1}</span>${chosen[k]}</div>`
+      : `<div class="slot"><span class="n">${k+1}</span>…</div>`).join("");
+    chips.innerHTML = pool.map((t,k)=>`<button class="chip" data-t="${t}" ${chosen.includes(t)?"disabled":""}>${t}</button>`).join("");
+    chips.querySelectorAll(".chip").forEach(b => b.onclick = () => {
+      if(answered) return;
+      chosen.push(b.dataset.t); tone(600+chosen.length*60,.08,"triangle");
+      draw();
+      if(chosen.length===target.length) check();
+    });
+  }
+  function check(){
+    answered = true;
+    const okAll = chosen.every((t,k)=>t===target[k]);
+    slots.innerHTML = target.map((t,k)=>`<div class="slot ${chosen[k]===t?"ok":"bad"}"><span class="n">${k+1}</span>${chosen[k]}${chosen[k]===t?"":` &nbsp;→ correcto: <b>${t}</b>`}</div>`).join("");
+    chips.querySelectorAll(".chip").forEach(b=>b.disabled=true);
+    $("#reset").classList.add("hidden");
+    resolve(okAll, q, 150);
+  }
+  $("#reset").onclick = () => { if(answered) return; chosen = []; draw(); };
+  draw();
+}
+
+function resolve(ok, q, base=100){
+  let gained = 0;
+  if(ok){
+    streak++; best = Math.max(best, streak);
+    gained = base + Math.min(streak-1,5)*10; score += gained; sfx.ok();
+  } else {
+    streak = 0; lives--; fails.push(q); sfx.bad();
+    $("#card").classList.add("shake");
+  }
+  setTimeout(sfx.stamp, 150);
+  const last = lives<=0 || i===deck.length-1;
+  $("#fb").innerHTML = `<div class="fb ${ok?"":"bad"}" role="status">
+      <b class="stamp">${ok?"EVIDENCIA VÁLIDA":"RECHAZADO"}</b>
+      <p>${ok?`+${gained} puntos. `:""}${q.e}</p>
+    </div>
+    <button class="primary" id="next">${last?"Ver resultado":"Siguiente pregunta"}</button>`;
+  $("#next").onclick = () => { if(last) end(); else { i++; render(); window.scrollTo({top:0}); } };
+  $("#next").focus({preventScroll:true});
+}
+
+function end(){
+  const done = lives>0;
+  const answeredN = done ? deck.length : i+1;
+  const right = answeredN - fails.length;
+  const pct = right/deck.length;
+  let rank = "Sin rastro", msg = "Esta vez el caso quedó sin resolver. Repasa los conceptos y vuelve a intentarlo.";
+  if(pct>=.9){rank="Auditor jefe"; msg="Puedes reconstruir cualquier decisión con IA. Nada se te escapa.";}
+  else if(pct>=.7){rank="Investigador senior"; msg="Dominas la trazabilidad. Revisa los errores para pulir los detalles.";}
+  else if(pct>=.45){rank="Investigador junior"; msg="Vas por buen camino, aunque algunos eslabones de la cadena quedaron flojos.";}
+  if(done) sfx.win();
+  app.innerHTML = `<div class="card">
+    <span class="tag">${done?"Caso cerrado":"Sin vidas"}</span>
+    <div class="rank">${rank}</div>
+    <div class="big">${score} puntos</div>
+    <p class="ctx">${right} de ${deck.length} correctas. Mejor racha: ${best}. ${msg}</p>
+    ${fails.length?`<h3 style="font-size:20px;margin-top:10px">Para repasar</h3>
+      <ol class="review">${fails.map(f=>`<li><b>${f.q}</b><br><span class="ctx">${f.e}</span></li>`).join("")}</ol>`:`<p>No fallaste ninguna pregunta.</p>`}
+    <button class="primary" id="again">Jugar de nuevo</button>
+  </div>`;
+  $("#again").onclick = () => { tone(440,.1,"triangle"); begin(); };
+}
+
+start();
+</script>
+</body>
+</html>
